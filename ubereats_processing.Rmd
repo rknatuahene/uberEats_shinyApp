@@ -1,0 +1,513 @@
+---
+title: "ubereats"
+output: pdf_document
+---
+```{r}
+library(ggplot2)
+library(dplyr)
+```
+
+```{r}
+# Multiple plot function
+#
+# ggplot objects can be passed in ..., or to plotlist (as a list of ggplot objects)
+# - cols:   Number of columns in layout
+# - layout: A matrix specifying the layout. If present, 'cols' is ignored.
+#
+# If the layout is something like matrix(c(1,2,3,3), nrow=2, byrow=TRUE),
+# then plot 1 will go in the upper left, 2 will go in the upper right, and
+# 3 will go all the way across the bottom.
+#
+multiplot <- function(..., plotlist=NULL, file, cols=1, layout=NULL) {
+  library(grid)
+
+  # Make a list from the ... arguments and plotlist
+  plots <- c(list(...), plotlist)
+
+  numPlots = length(plots)
+
+  # If layout is NULL, then use 'cols' to determine layout
+  if (is.null(layout)) {
+    # Make the panel
+    # ncol: Number of columns of plots
+    # nrow: Number of rows needed, calculated from # of cols
+    layout <- matrix(seq(1, cols * ceiling(numPlots/cols)),
+                    ncol = cols, nrow = ceiling(numPlots/cols))
+  }
+
+ if (numPlots==1) {
+    print(plots[[1]])
+
+  } else {
+    # Set up the page
+    grid.newpage()
+    pushViewport(viewport(layout = grid.layout(nrow(layout), ncol(layout))))
+
+    # Make each plot, in the correct location
+    for (i in 1:numPlots) {
+      # Get the i,j matrix positions of the regions that contain this subplot
+      matchidx <- as.data.frame(which(layout == i, arr.ind = TRUE))
+
+      print(plots[[i]], vp = viewport(layout.pos.row = matchidx$row,
+                                      layout.pos.col = matchidx$col))
+    }
+  }
+}
+```
+
+```{r ubereats data}
+ubereats.df <- readr::read_csv("./processed_data/restaurant_menu_details.csv")
+```
+```{r}
+##url column cannot be na so remove rows that have na in URL
+ubereats.df = ubereats.df[!is.na(ubereats.df$url),]
+```
+```{r}
+#go through each 15 feature and clean up if needed.
+#1a.restaurant city per Uber's classification
+unique_uber_cities = unique(ubereats.df$uber_city)
+cnt_of_cities = length(unique(ubereats.df$uber_city))
+sum(is.na(ubereats.df$uber_city))
+```
+```{r}
+#1b. Restaurant name
+unique_rest_names = unique(ubereats.df$name)
+rest_cnt = length(unique(ubereats.df$name))
+rest_cnt
+sum(is.na(ubereats.df$name))
+sum(nchar(ubereats.df$name)<1)  #no empty names either
+
+#1c.food category
+unique_cat = unique(ubereats.df$food_category)
+cat_cnt = length(unique(ubereats.df$food_category))
+cat_cnt
+sum(!is.na(ubereats.df$food_category))
+ubereats.df$food_category = tolower(ubereats.df$food_category)
+cat_cnt_by_state = ubereats.df%>% filter(.,!is.na(state))%>%group_by(.,state,tolower(food_category)) %>% summarise(cat_cnt=n())
+cnt_by_state = ubereats.df%>% filter(.,!is.na(state))%>%group_by(.,state) %>% summarise(state_cnt=n())
+
+joined_data = left_join(cat_cnt_by_state, cnt_by_state, by="state")
+joined_data = joined_data[joined_data$cat_cnt > mean(joined_data$cat_cnt),]
+joined_data  %>% filter(state =="CA") %>% mutate(ratio = cat_cnt/state_cnt)%>%arrange(desc(ratio)) %>%top_n(50)
+sum(nchar(ubereats.df$food_category)<1, na.rm=TRUE)  #no empty names either if data isn't missing
+
+#1d
+#normalize state 
+ubereats.df$state = toupper(ubereats.df$state)
+
+ubereats.df$state = ifelse(ubereats.df$state=="ALABAMA","AL", ubereats.df$state)
+ubereats.df$state = ifelse(ubereats.df$state %in% c("CALIF","CALIFORNIA"),"CA", ubereats.df$state)
+ubereats.df$state = ifelse(ubereats.df$state=="ARIZONA","AR", ubereats.df$state)
+ubereats.df$state = ifelse(ubereats.df$state=="ARKANSAS","AR", ubereats.df$state)
+ubereats.df$state = ifelse(ubereats.df$state=="TEXAS","TX", ubereats.df$state)
+ubereats.df$state = ifelse(nchar(ubereats.df$state) >2 ,NA, ubereats.df$state)
+unique(ubereats.df$state)
+
+#1e
+##priciness_level data
+unique(ubereats.df$priciness_level)
+ubereats.df$priciness_level = ifelse(ubereats.df$priciness_level %in% c('$','$$', '$$$','$$$$','$$$$$'), ubereats.df$priciness_level, NA)
+priciness_grouped = ubereats.df %>% group_by(priciness_level) %>% summarise(n=n()) %>% arrange(desc(n))
+priciness_grouped$ratio = priciness_grouped$n/sum(priciness_grouped$n)
+priciness_grouped
+
+#Cali
+priciness_grouped = ubereats.df %>% filter(state=="CA") %>% group_by(priciness_level) %>% summarise(n=n()) %>% arrange(desc(n))
+priciness_grouped$ratio = priciness_grouped$n/sum(priciness_grouped$n)
+priciness_grouped
+
+
+#1f
+##ratings -- has a lot of NAs
+unique(ubereats.df$ratings)
+ratings_grouped = ubereats.df %>% filter(state=="CA") %>% group_by(ratings) %>% summarise(n=n()) %>% arrange(desc(n))
+ratings_grouped$ratio = ratings_grouped$n/sum(ratings_grouped$n)
+ratings_grouped
+
+#1g
+##num reviews
+unique(ubereats.df$num_reviews)
+numReviews_grouped = ubereats.df %>% filter(state=="CA") %>% group_by(num_reviews) %>% summarise(n=n()) %>% arrange(desc(num_reviews))
+numReviews_grouped$ratio = numReviews_grouped$n/sum(numReviews_grouped$n)
+numReviews_grouped
+
+
+#1h
+#sub_menu_title
+ubereats.df$sub_menu_title = tolower(ubereats.df$sub_menu_title)
+unique(ubereats.df$sub_menu_title)
+submenu_grouped = ubereats.df %>% filter(state=="CA") %>% group_by(sub_menu_title) %>% summarise(n=n()) %>% arrange(desc(n))
+submenu_grouped$ratio = submenu_grouped$n/sum(submenu_grouped$n)
+submenu_grouped
+
+#1i
+#local_city
+ubereats.df$local_city = tolower(ubereats.df$local_city)
+ubereats.df$local_city = ifelse(endsWith(ubereats.df$local_city,"francisco"),"san francisco", ubereats.df$local_city)
+unique(ubereats.df$local_city)
+
+localcity_grouped = ubereats.df %>% filter(state=="CA") %>% group_by(local_city) %>% summarise(n=n()) %>% arrange(desc(n))
+localcity_grouped$ratio = localcity_grouped$n/sum(localcity_grouped$n)
+localcity_grouped
+
+
+#1j
+##clean up price data
+ubereats.df$`price($)` = as.numeric(ubereats.df$`price($)`)
+
+
+filtered_set = ubereats.df %>% filter((state=="CA") & (`price($)` > 1)) %>% select(uber_city, name, url, food_category, ratings, num_reviews, sub_menu_title, dish_name, price = `price($)`, local_city, state)
+filtered_set = filtered_set %>% filter(., !startsWith(sub_menu_title,"picked for you"))
+
+```
+```{r}
+city_rest_cnt = filtered_set %>% select(.,name,local_city) %>% distinct() %>% group_by(.,local_city) %>% summarise(., total_cnt = n()) %>% filter(total_cnt > 100)%>%top_n(15, total_cnt)
+#filtered_set %>% select(.,uber_city,name,zipcode,url) %>% distinct() %>% group_by(.,zipcode) %>% summarise(., total_cnt = n()) %>% arrange(.,desc(total_cnt))
+
+ggplot(data=city_rest_cnt, aes(x=reorder(local_city, -total_cnt),y = total_cnt)) +
+  geom_bar(stat="identity", fill="steelblue") +coord_flip() + theme_classic() +
+  labs(title ="Count of listed restaurants by city in CA", x ="Cities", y = "count of unique restaurants")
+
+view(city_rest_cnt)
+```
+
+```{r}
+
+#find distribution of menu prices by popular sub-menus
+filtered_set$sub_menu_title = tolower(filtered_set$sub_menu_title)
+
+
+filtered_set$sub_menu_title =  ifelse(grepl("kid",filtered_set$sub_menu_title, fixed=TRUE), "kids", filtered_set$sub_menu_title)
+filtered_set$sub_menu_title =  ifelse(grepl("beverage",filtered_set$sub_menu_title, fixed=TRUE), "beverages", filtered_set$sub_menu_title)
+filtered_set$sub_menu_title =  ifelse(grepl("drinks",filtered_set$sub_menu_title, fixed=TRUE), "beverages", filtered_set$sub_menu_title)
+filtered_set$sub_menu_title =  ifelse(grepl("dessert",filtered_set$sub_menu_title, fixed=TRUE), "desserts", filtered_set$sub_menu_title)
+filtered_set$sub_menu_title =  ifelse(grepl("salad",filtered_set$sub_menu_title, fixed=TRUE), "salads", filtered_set$sub_menu_title)
+filtered_set$sub_menu_title =  ifelse(grepl("main",filtered_set$sub_menu_title, fixed=TRUE), "entrees", filtered_set$sub_menu_title)
+filtered_set$sub_menu_title =  ifelse(grepl("sandwich",filtered_set$sub_menu_title, fixed=TRUE), "sandwiches", filtered_set$sub_menu_title)
+filtered_set$sub_menu_title =  ifelse(grepl("burrito",filtered_set$sub_menu_title, fixed=TRUE), "burritos", filtered_set$sub_menu_title)
+filtered_set$sub_menu_title =  ifelse(grepl("burger",filtered_set$sub_menu_title, fixed=TRUE), "burgers", filtered_set$sub_menu_title)
+filtered_set$sub_menu_title =  ifelse(grepl("taco",filtered_set$sub_menu_title, fixed=TRUE), "tacos", filtered_set$sub_menu_title)
+filtered_set$sub_menu_title =  ifelse(grepl("entree",filtered_set$sub_menu_title, fixed=TRUE), "entrees", filtered_set$sub_menu_title)
+filtered_set$sub_menu_title =  ifelse(grepl("side",filtered_set$sub_menu_title, fixed=TRUE), "sides", filtered_set$sub_menu_title)
+filtered_set$sub_menu_title =  ifelse(grepl("soup",filtered_set$sub_menu_title, fixed=TRUE), "soups", filtered_set$sub_menu_title)
+filtered_set$sub_menu_title =  ifelse(grepl("wrap",filtered_set$sub_menu_title, fixed=TRUE), "wraps", filtered_set$sub_menu_title)
+filtered_set$sub_menu_title =  ifelse(grepl("breakfast",filtered_set$sub_menu_title, fixed=TRUE), "breakfast", filtered_set$sub_menu_title)
+filtered_set$sub_menu_title =  ifelse(grepl("lunch",filtered_set$sub_menu_title, fixed=TRUE), "lunch", filtered_set$sub_menu_title)
+filtered_set$sub_menu_title =  ifelse(grepl("dinner",filtered_set$sub_menu_title, fixed=TRUE), "dinner", filtered_set$sub_menu_title)
+filtered_set$sub_menu_title =  ifelse(grepl("supper",filtered_set$sub_menu_title, fixed=TRUE), "dinner", filtered_set$sub_menu_title)
+filtered_set$sub_menu_title =  ifelse(grepl("chicken",filtered_set$sub_menu_title, fixed=TRUE), "chicken", filtered_set$sub_menu_title)
+filtered_set$sub_menu_title =  ifelse(grepl("beef",filtered_set$sub_menu_title, fixed=TRUE), "meats", filtered_set$sub_menu_title)
+filtered_set$sub_menu_title =  ifelse(grepl("meat",filtered_set$sub_menu_title, fixed=TRUE), "meats", filtered_set$sub_menu_title)
+filtered_set$sub_menu_title =  ifelse(grepl("pork",filtered_set$sub_menu_title, fixed=TRUE), "meats", filtered_set$sub_menu_title)
+filtered_set$sub_menu_title =  ifelse(grepl("pizza",filtered_set$sub_menu_title, fixed=TRUE), "pizza", filtered_set$sub_menu_title)
+
+# sub_menu_data_all = filtered_set %>% select(., name,sub_menu_title)%>% filter(., !startsWith(sub_menu_title,"picked for you")) %>% distinct() %>% 
+#   group_by(.,sub_menu_title)%>%summarise(.,total_count = n()) %>% arrange(.,desc(total_count)) %>% filter(.,total_count >500)%>%head(15)
+# 
+
+#store this master dataset
+write.csv(filtered_set,"CA_data.csv")
+
+rest_cnt = filtered_set %>% select(url) %>% distinct()%>% summarise(n=n())
+test = filtered_set %>% select(uber_city) %>% filter(endsWith(uber_city, "california")) %>% distinct() %>%
+view(test)
+
+
+(filtered_set %>% select(name, local_city) %>% distinct() %>% group_by(local_city) %>% summarise(n=n()) %>% top_n(1))$local_city
+
+ALL_CA = ggplot(data=sub_menu_data_all, aes(x=reorder(sub_menu_title, -total_count),y = total_count)) +
+  geom_bar(stat="identity", fill="steelblue") +coord_flip() + theme_classic() +
+  labs(title ="Popular sub-menus(All Cali)", x ="sub-menu sections", y = "count across menus in CA")
+
+ALL_CA
+##most popular in Los Angeles
+sub_menu_data_LA = filtered_set %>% filter(local_city =="Los Angeles") %>% select(., name,sub_menu_title) %>% distinct() %>% 
+  group_by(.,sub_menu_title)%>%summarise(.,total_count = n()) %>% arrange(.,desc(total_count)) %>%head(15)
+
+LA = ggplot(data=sub_menu_data_LA, aes(x=reorder(sub_menu_title, -total_count),y = total_count)) +
+  geom_bar(stat="identity", fill="steelblue") +coord_flip() + theme_classic() +
+  labs(title ="Popular sub-menus(LA)", x ="sub-menu sections", y = "count across menus in los Angeles")
+
+multiplot(ALL_CA, LA, cols=2)
+```
+
+```{r}
+#distribution of meal prices within submenus
+#get meal prices for the top submenus only.
+filtered_set$`price($)`= as.numeric(filtered_set$`price($)`)
+
+price_data_all = inner_join(filtered_set,sub_menu_data_all, by="sub_menu_title")
+price_data_all = price_data_all%>%select(sub_menu_title, `price($)`)
+
+#clean outliers
+price_cut_off = price_data_all %>% group_by(sub_menu_title) %>% summarise(., upperB = quantile(`price($)`, probs=0.95, na.rm=T))
+price_data_all = inner_join(price_data_all,price_cut_off, by="sub_menu_title")
+price_data_all = price_data_all %>% filter((`price($)`>1) & `price($)` <= upperB)
+
+#violin plot
+VIOLIN_CA= ggplot(data = price_data_all, aes(x = sub_menu_title, y = `price($)`)) + geom_violin(aes(fill = sub_menu_title)) +coord_flip() +
+          labs(title ="Price distribution sub-menus(Cali)", x ="sub-menus", y = "meal price($) across the state of California")
+
+
+#now do this for just LA
+price_data_LA = inner_join(filtered_set,sub_menu_data_all, by="sub_menu_title") %>% filter(local_city == "Los Angeles") %>%select(sub_menu_title, `price($)`)
+#clean outliers
+price_cut_off_LA = price_data_LA %>% group_by(sub_menu_title) %>% summarise(., upperB = quantile(`price($)`, probs=0.95, na.rm=T))
+price_data_LA = inner_join(price_data_LA,price_cut_off_LA, by="sub_menu_title")
+price_data_LA = price_data_LA %>% filter((`price($)`>0.01) & `price($)` <= upperB)
+
+#voilin plot
+VIOLIN_LA= ggplot(data = price_data_LA, aes(x = sub_menu_title, y = `price($)`)) + geom_violin(aes(fill = sub_menu_title)) +coord_flip() +
+          labs(title ="Price distribution sub-menus(LA)", x ="sub-menus", y = "meal price($) in Los Angeles")
+multiplot(VIOLIN_CA, VIOLIN_LA, cols=2)
+
+```
+```{r}
+#now do this for just San Fran
+price_data_SF = inner_join(filtered_set,sub_menu_data_all, by="sub_menu_title") %>% filter(local_city == "San Francisco") %>%select(sub_menu_title, `price($)`)
+#clean outliers
+price_cut_off_SF = price_data_SF %>% group_by(sub_menu_title) %>% summarise(., upperB = quantile(`price($)`, probs=0.95, na.rm=T))
+price_data_SF = inner_join(price_data_SF,price_cut_off_SF, by="sub_menu_title")
+price_data_SF = price_data_SF %>% filter((`price($)`>0.01) & `price($)` <= upperB)
+
+#voilin plot
+VIOLIN_SF= ggplot(data = price_data_SF, aes(x = sub_menu_title, y = `price($)`)) + geom_violin(aes(fill = sub_menu_title)) +coord_flip() +
+          labs(title ="Price distribution sub-menus(SF)", x ="sub-menus", y = "meal price($) in San Fran")
+multiplot(VIOLIN_LA, VIOLIN_SF, cols=2)
+```
+```{r}
+#are mean prices different? - perform 2-sample t-tests and compare p-values. p-value <0.025 rejects the null in favor of the alternative hypothesis that mean of prices are different.
+
+sub_menu_ls = strsplit(paste0(sub_menu_data_all$sub_menu_title,collapse = "|"),"|", fixed= TRUE)[[1]] #get the top sub-menu categories
+
+##create the master dataframe once
+master_relative_prices = setNames(data.frame(matrix(ncol = 5, nrow = 0), stringsAsFactors = FALSE), c("sub_menu_title", "p_value", "mean_ratio", "is_diff_price","local_city"))
+###don't recreate master_relative_prices within this sub-block as you will rbind to it below
+
+top_cities = strsplit(paste0(city_rest_cnt$local_city,collapse = "|"),"|", fixed= TRUE)[[1]] #get the top cities
+
+control_c = "los angeles"
+##prepare control
+price_data_control = inner_join(filtered_set,sub_menu_data_all, by="sub_menu_title") %>% filter(local_city == control_c) %>%select(sub_menu_title, price)
+#clean outliers
+price_cut_off_control = price_data_control %>% group_by(sub_menu_title) %>% summarise(., upperB = quantile(price, probs=0.95, na.rm=T))
+price_data_control = inner_join(price_data_control,price_cut_off_control, by="sub_menu_title")
+price_data_control = price_data_control %>% filter((price >0.01) & price <= upperB)
+
+for(test_c in top_cities)
+{
+  cat("\ndoing t-tests for city:",test_c)
+  ##prepare test
+  price_data_test = inner_join(filtered_set,sub_menu_data_all, by="sub_menu_title") %>% filter(local_city == test_c) %>%select(sub_menu_title, price)
+  #clean outliers
+  price_cut_off_test = price_data_test %>% group_by(sub_menu_title) %>% summarise(., upperB = quantile(price, probs=0.95, na.rm=T))
+  price_data_test = inner_join(price_data_test,price_cut_off_test, by="sub_menu_title")
+  price_data_test = price_data_test %>% filter((price >0.01) & price <= upperB)
+  
+  CL = 0.025 ## 2 tailed test
+  pVal_df = c()
+  ratios_df = c()
+  for(sm in sub_menu_ls)
+  {
+    control_prices = price_data_control%>% filter(sub_menu_title == sm) %>% select(price)
+    test_prices    = price_data_test%>% filter(sub_menu_title == sm) %>% select(price)
+    pVal_df[sm] = as.numeric((t.test(control_prices, test_prices, alternative = "two.sided")$p.value)[[1]]) #Conducting the t-test for same sub-menu across two cities
+    ratios_df[sm] = mean(test_prices$price, na.rm= TRUE)/ mean(control_prices$price, na.rm = TRUE)
+     
+  }
+  pVal_df = data.frame(enframe(pVal_df, name="sub_menu_title", value="p_value"), stringsAsFactors = FALSE)
+  ratios_df = data.frame(enframe(ratios_df, name="sub_menu_title", value="mean_ratio"), stringsAsFactors = FALSE)
+  
+  pVal_df = inner_join(pVal_df, ratios_df, by="sub_menu_title")
+  pVal_df$is_diff_price = ifelse(pVal_df$p_value < CL, "Yes", "No")
+  
+  pVal_df$mean_ratio = ifelse(pVal_df$is_diff_price, pVal_df$mean_ratio, 1)
+  pVal_df$local_city = test_c
+  
+  master_relative_prices = rbind(master_relative_prices, pVal_df)
+}
+master_relative_prices
+
+#master_relative_prices = master_relative_prices%>%filter(local_city !=  "los angeles")
+#master_relative_prices$is_diff_price = ifelse(master_relative_prices$is_diff_price, "Yes", "No")
+sample = master_relative_prices%>%filter(local_city %in% c("los angeles", "san francisco","san jose","sacramento"))
+
+alpha =0.025
+fig.width=10
+fig.height=11
+# ggplot(data=sample, aes( x = sub_menu_title, y = p_value )) + geom_bar(stat="identity", aes(fill=sub_menu_title), position ="dodge" ,show.legend = FALSE) + facet_grid(rows = vars(local_city)) +
+#   coord_flip(ylim = c(0,alpha)) 
+ggplot(data = master_relative_prices, aes( x = sub_menu_title, y = is_diff_price )) + geom_point(aes(color=is_diff_price), show.legend = F) + coord_flip() +facet_wrap(~local_city) 
+
+```
+
+
+
+```{r}
+``{r}
+#ratings and menu prices
+
+control_list = c("los angeles", "san francisco","san jose","sacramento")
+control_list = c("los angeles")
+
+price_data_control = inner_join(filtered_set %>% filter(!is.na(ratings)),sub_menu_data_all, by="sub_menu_title") %>% filter(local_city %in% control_list) %>%select(local_city, sub_menu_title, ratings, price)
+#price_data_control = inner_join(filtered_set %>% filter(!is.na(ratings)),sub_menu_data_all, by="sub_menu_title") %>%select(sub_menu_title, ratings, `price($)`)
+
+#clean outliers
+price_cut_off_control = price_data_control %>% group_by(sub_menu_title) %>% summarise(., upperB = quantile(price, probs=0.95, na.rm=T))
+price_data_control = inner_join(price_data_control,price_cut_off_control, by="sub_menu_title")
+price_data_control = price_data_control %>% filter((price >0.01) & price <= upperB)
+
+ratings_data = price_data_control %>% group_by(local_city, ratings) %>% summarise(cnt = n(), avg_price = mean(price,na.rm= TRUE)) %>% arrange(desc(local_city),desc(ratings))
+
+g <- ggplot(data = ratings_data, aes(x = ratings, y = avg_price)) + geom_point(aes(color = local_city))
+g + geom_smooth(method = lm, se=T) 
+
+
+linearMod <- lm(avg_price ~ ratings -1, data=ratings_data) 
+print(summary(linearMod))
+
+modelCoeffs <- summary(linearMod)$coefficients  # model coefficients
+beta.estimate <- modelCoeffs["ratings", "Estimate"]
+#intercept.estimate = modelCoeffs["(Intercept)", "Estimate"]
+pval.beta = modelCoeffs["ratings", "Pr(>|t|)"]
+adj_rsq = summary(linearMod)$adj.r.squared 
+cat(beta.estimate,"\n")
+cat(pval.beta,"\n")
+cat(adj_rsq,"\n")
+
+test = data.frame("regression_beta1" = round(beta.estimate,5), "p_value" = pval.beta, "adjusted R-sqrd" = round(adj_rsq,5))
+```
+
+```{r}
+#are there keywords in dish description that appear in higher priced meals
+library(ggwordcloud)
+control_list = top_cities
+dishes_top_cities =  inner_join(filtered_set,sub_menu_data_all, by="sub_menu_title") 
+dishes_top_cities = dishes_top_cities%>%filter((local_city %in% control_list) & (!is.na(dish_name) & (dish_name !="NA"))) %>% 
+                      select(sub_menu_title, dish_name, price, local_city) 
+clean_up = dishes_top_cities %>% group_by(sub_menu_title) %>% summarise(., upperB = quantile(price, probs=0.90, na.rm=T)) %>% filter(upperB > 10)
+dishes_top_cities = inner_join(dishes_top_cities, clean_up, by="sub_menu_title")
+dishes_top_cities = dishes_top_cities %>% filter(price >= upperB) %>% group_by(dish_name) %>% 
+                      summarise(cnt=n(), avg_price = mean(price,na.rm =TRUE)) %>% select(word=dish_name,freq=avg_price) 
+dishes_top_cities$word = tolower(dishes_top_cities$word)
+
+dishes_top_cities %>% wordcloud2()
+
+
+
+```
+
+```{r}
+customer_data = read.csv("customer_feed.csv", stringsAsFactors = F)
+```
+
+```{r}
+pricing_CL = 0.05/2
+control_c = "los angeles"
+
+test_c = tolower(unique(customer_data$city))
+
+
+##create the master dataframe once
+master_relative_prices = setNames(data.frame(matrix(ncol = 5, nrow = 0), stringsAsFactors = FALSE), c("sub_menu_title", "p_value", "mean_ratio", "is_diff_price","local_city"))
+      
+##prepare test
+price_data_test = inner_join(filtered_set,sub_menu_data_all, by="sub_menu_title") %>% filter(local_city == test_c) %>%select(sub_menu_title, price)
+#clean outliers
+price_cut_off_test = price_data_test %>% group_by(sub_menu_title) %>% summarise(., upperB = quantile(price, probs=0.95, na.rm=T))
+price_data_test = inner_join(price_data_test,price_cut_off_test, by="sub_menu_title")
+price_data_test = price_data_test %>% filter((price >0.01) & price <= upperB)
+
+pVal_df = c()
+ratios_df = c()
+control_mean = c()
+for(sm in sub_menu_ls)
+{
+    control_prices = price_data_control%>% filter(sub_menu_title == sm) %>% select(price)
+    test_prices    = price_data_test%>% filter(sub_menu_title == sm) %>% select(price)
+    pVal_df[sm] = as.numeric((t.test(control_prices, test_prices, alternative = "two.sided")$p.value)[[1]]) #Conducting the t-test for same sub-menu across two cities
+    ratios_df[sm] = mean(test_prices$price, na.rm= TRUE)/ mean(control_prices$price, na.rm = TRUE)
+    control_mean[sm] =  mean(control_prices$price, na.rm = TRUE)
+}
+pVal_df = data.frame(enframe(pVal_df, name="sub_menu_title", value="p_value"), stringsAsFactors = FALSE)
+ratios_df = data.frame(enframe(ratios_df, name="sub_menu_title", value="mean_ratio"), stringsAsFactors = FALSE)
+control_mean_df = data.frame(enframe(control_mean, name="sub_menu_title", value="control_mean"), stringsAsFactors = FALSE)
+
+pVal_df = inner_join(pVal_df, ratios_df, by="sub_menu_title")
+pVal_df = inner_join(pVal_df, control_mean_df, by="sub_menu_title")
+
+pVal_df$is_diff_price = ifelse(pVal_df$p_value < pricing_CL, "Yes", "No")
+
+pVal_df$mean_ratio = ifelse(pVal_df$is_diff_price == "Yes", pVal_df$mean_ratio, 1)
+pVal_df$local_city = test_c
+
+master_relative_prices = rbind(master_relative_prices, pVal_df)
+
+master_relative_prices = inner_join(master_relative_prices, customer_data, by="sub_menu_title")
+
+###now get the regression beta for the city
+price_data_control = inner_join(filtered_set %>% filter(!is.na(ratings)),sub_menu_data_all, by="sub_menu_title") %>% filter(local_city == test_c) %>%select(local_city, sub_menu_title, ratings, price)
+
+#clean outliers
+price_cut_off_control = price_data_control %>% group_by(sub_menu_title) %>% summarise(., upperB = quantile(price, probs=0.95, na.rm=T))
+price_data_control = inner_join(price_data_control,price_cut_off_control, by="sub_menu_title")
+price_data_control = price_data_control %>% filter((price >0.01) & price <= upperB)
+
+ratings_data = price_data_control %>% group_by(local_city, ratings) %>% summarise(avg_price = mean(price,na.rm= TRUE))
+linearMod <- lm(avg_price ~ ratings -1, data=ratings_data) 
+modelCoeffs <- summary(linearMod)$coefficients  # model coefficients
+beta.estimate <- modelCoeffs["ratings", "Estimate"]
+pval.beta = modelCoeffs["ratings", "Pr(>|t|)"]
+master_relative_prices$beta.ratio = (master_relative_prices$ratings * ifelse(pval.beta < pricing_CL, beta.estimate,0))/master_relative_prices$control_mean
+master_relative_prices$weighted_adj = 0.5*(master_relative_prices$mean_ratio + master_relative_prices$beta.ratio)
+
+#winsorize price data for selected input and get range for control city
+price_data = inner_join(filtered_set,sub_menu_data_all, by="sub_menu_title") %>% filter(local_city == control_c) %>%select(sub_menu_title, price)
+#clean outliers
+price_cut_off = price_data %>% group_by(sub_menu_title) %>% summarise(., upperB = quantile(price, probs=0.95, na.rm=T))
+price_data = inner_join(price_data,price_cut_off, by="sub_menu_title")
+price_data = price_data %>% filter((price >0.01) & price <= upperB) %>% group_by(sub_menu_title) %>% 
+              summarise(control.lower = min(price, na.rm = T), control.upper = max(price, na.rm =T))
+
+master_relative_prices = inner_join(master_relative_prices, price_data, by="sub_menu_title")
+
+master_relative_prices$recommended.lower = master_relative_prices$weighted_adj* master_relative_prices$control.lower
+master_relative_prices$recommended.upper = master_relative_prices$weighted_adj* master_relative_prices$control.upper
+
+master_relative_prices = master_relative_prices %>% select(name,sub_menu_title, Cust.Price.Lower=Price.Lower, Cust.Price.Upper = Price.Upper, Recommended.Price.Lower= recommended.lower, Recommended.Price.Upper = recommended.upper)
+
+master_relative_prices
+```
+```{r}
+custPrices_df = data.frame(matrix(ncol=2, nrow=0))
+colnames(custPrices_df) = c("sub_menu_title","price")
+
+recommendPrices_df = data.frame(matrix(ncol=2, nrow=0))
+colnames(recommendPrices_df) = c("sub_menu_title","price")
+
+for(idx in 1:nrow(master_relative_prices))
+{
+  sub_menu_title = master_relative_prices[idx,"sub_menu_title"]
+  price = c(master_relative_prices[idx,"Cust.Price.Lower"],runif(8,master_relative_prices[idx,"Cust.Price.Lower"], master_relative_prices[idx,"Cust.Price.Upper"]),master_relative_prices[idx,"Cust.Price.Upper"])
+  temp_df = data.frame(sub_menu_title, price, stringsAsFactors = FALSE) 
+  custPrices_df= rbind(custPrices_df, temp_df)
+  
+  
+  price = c(master_relative_prices[idx,"Recommended.Price.Lower"],runif(8,master_relative_prices[idx,"Recommended.Price.Lower"],  master_relative_prices[idx,"Recommended.Price.Upper"]), master_relative_prices[idx,"Recommended.Price.Upper"])
+  temp_df = data.frame(sub_menu_title, price, stringsAsFactors = FALSE) 
+  recommendPrices_df = rbind(recommendPrices_df,temp_df)
+}
+
+# custPrices_df = data.frame(enframe(custPrices_df, name="sub_menu_title", value="price"), stringsAsFactors = FALSE)
+# recommendPrices_df = data.frame(enframe(recommendPrices_df, name="sub_menu_title", value="price"), stringsAsFactors = FALSE)
+
+custPrices_df$party = "Customer Price"
+recommendPrices_df$party = "Recommended Price"
+
+allPrices = rbind(custPrices_df, recommendPrices_df)
+allPrices
+allPrices %>% ggplot(aes(x=sub_menu_title,y=price, color = party)) + geom_line(size =2 , position=position_dodge(width=0.4)) +coord_flip()
+```
+
+
