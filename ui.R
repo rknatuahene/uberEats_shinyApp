@@ -12,10 +12,11 @@ shinyUI(dashboardPage(
         sidebarMenu(
             menuItem("All Cali", tabName = "main", icon = icon("map")),
             menuItem("Top cities", tabName = "city", icon = icon("map")),
-            menuItem("Are prices different?", tabName = "regressions", icon = icon("map")),
-            menuItem("What are ratings worth?", tabName = "ratings", icon = icon("map")),
-            menuItem("Key words and prices", tabName = "wcloud", icon = icon("map")),
-            menuItem("price my menu", tabName = "pricing", icon = icon("map"))
+            menuItem("Are prices different?", tabName = "regressions", icon = icon("question")),
+            menuItem("What are ratings worth?", tabName = "ratings", icon = icon("question")),
+            menuItem("Key words and prices", tabName = "wcloud", icon = icon("puzzle-piece")),
+            menuItem("Price my menu", tabName = "pricing", icon = icon("check")),
+            menuItem("About Project", tabName = "about", icon = icon("info"))
         )
     ),
     dashboardBody(
@@ -80,7 +81,10 @@ shinyUI(dashboardPage(
                     fluidRow(box(DT::dataTableOutput("recommendedTable")),
                              box(DT::dataTableOutput("customerInput"))),
                     fluidRow(box(plotOutput("recommendedPlot"), height = 500, width = 500))
-                    )
+                    ),
+            tabItem(tabName = "about",
+                    fluidRow(htmlOutput("aboutProject"))
+            )
             )
         )
     )

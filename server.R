@@ -212,7 +212,7 @@ shinyServer(function(input, output){
     )
         
     plotRecommendation = reactive({
-        #same function logic as recommendationEngine about except plot recommended price range against customer's initial price points
+        #same function logic as recommendationEngine above except plot recommended price range against customer's initial price points
         master_relative_prices = setNames(data.frame(matrix(ncol = 5, nrow = 0), stringsAsFactors = FALSE), c("sub_menu_title", "p_value", "mean_ratio", "is_diff_price","local_city"))
         test_c = tolower(unique(customer_data$city))
         
@@ -253,10 +253,16 @@ shinyServer(function(input, output){
         ###now get the regression beta for the city
         price_data_control = inner_join(filtered_set %>% filter(!is.na(ratings)),sub_menu_data_all, by="sub_menu_title") %>% filter(local_city == test_c) %>%select(local_city, sub_menu_title, ratings, price)
         
+        
         #clean outliers
         price_cut_off_control = price_data_control %>% group_by(sub_menu_title) %>% summarise(., upperB = quantile(price, probs=0.95, na.rm=T))
         price_data_control = inner_join(price_data_control,price_cut_off_control, by="sub_menu_title")
         price_data_control = price_data_control %>% filter((price >0.01) & price <= upperB)
+        
+        ##get min max range for city
+        city_min_max = price_data_control %>% select(sub_menu_title,price)%>%group_by(sub_menu_title)%>%summarise(actual.lower = min(price), actual.upper= max(price))
+        
+        city_min_max = rbind(city_min_max%>%select(sub_menu_title, price =actual.lower), city_min_max%>%select(sub_menu_title, price=actual.upper))
         
         ratings_data = price_data_control %>% group_by(local_city, ratings) %>% summarise(avg_price = mean(price,na.rm= TRUE))
         linearMod <- lm(avg_price ~ ratings -1, data=ratings_data) 
@@ -286,7 +292,6 @@ shinyServer(function(input, output){
         
         recommendPrices_df = data.frame(matrix(ncol=2, nrow=0))
         colnames(recommendPrices_df) = c("sub_menu_title","price")
-        cat("number of rows:",nrow(master_relative_prices),"\n")
         for(idx in 1:nrow(master_relative_prices))
         {
             sub_menu_title = master_relative_prices[idx,"sub_menu_title"]
@@ -300,9 +305,9 @@ shinyServer(function(input, output){
             recommendPrices_df = rbind(recommendPrices_df,temp_df)
         }
         custPrices_df$party = "Customer Price"
-        recommendPrices_df$party = "Recommended Price"
-        
-        allPrices = rbind(custPrices_df, recommendPrices_df)
+        recommendPrices_df$party = "Recommended(Model) Price"
+        city_min_max$party = "Actual Price"
+        allPrices = rbind(custPrices_df, recommendPrices_df, city_min_max)
         allPrices
         
     })
@@ -345,6 +350,16 @@ shinyServer(function(input, output){
         datatable(recommendation_engine(), rownames=FALSE)
     })
     
+    output$aboutProject <- renderText({"<p><p><p><p><p><p><p><p><p>Project uses data scraped from UberEats US website.<br>The dataset comprises of restaurants, their menus and menu prices located in California.
+     The research question is centered around pricing sub-menu sections of restaurant menus. In particular can we use the data to 
+    create a simple pricing model such that a restaurant operator can submit a spreadsheet of specific sub-menu items, their location and rating and have the model
+    suggest a price range for each sub-menu item that's accurate and representative of the actual observed data.
+    <p> The advantage of the simplified model is that we can reduce the data requirement to just listings from one city - the city with the most listings - and use
+    that data to model prices in other cities.
+    <p>I also analysed the correlation between ratings and meal prices within each sub-menu and incorporated that into our pricing model
+    <p>Although I analysed keywords in dish names to see if there are certain descriptive words associated with higher meal prices, there wasn't
+    even evidence in the corpus I used to justify including textual data into the pricing model at this time"
+        })
     
     # show statistics using infoBox
     output$rest_total <- renderInfoBox({
@@ -381,5 +396,6 @@ shinyServer(function(input, output){
                 top_city, 
                 icon = icon("hand-o-up"))
     })
+    
     
 })
