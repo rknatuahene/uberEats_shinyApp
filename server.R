@@ -35,6 +35,7 @@ shinyServer(function(input, output){
    
     
     pVal_matrix = reactive({
+    #perform 2 sample t-tests on the means of like sub-menu prices across different cities
        cities_to_regress = top_cities
        if(input$selectedCity_reg != "ALL")
        {
@@ -85,6 +86,9 @@ shinyServer(function(input, output){
     })
     
     ratings_regression = reactive({
+        #run linear regression model lm(avg_price ~ ratings -1)
+        #r-squared is much larger without the intercept.
+        #thus regressions down without the intercept
         cities_to_regress = top_cities
         if(input$selectedCity_ratings != "ALL")
         {
@@ -102,6 +106,7 @@ shinyServer(function(input, output){
  })
     
     ratings_modelOutputs = reactive({
+        ##prepare regression coefficients and r-square for tabular display
         linearMod <- lm(avg_price ~ ratings -1, data=ratings_regression()) 
         modelCoeffs <- summary(linearMod)$coefficients  # model coefficients
         beta.estimate <- modelCoeffs["ratings", "Estimate"]
@@ -111,6 +116,8 @@ shinyServer(function(input, output){
     })
     
     dishname_wCloud = reactive({
+        #generate wordclould of words in dish names. freq set to mean price of the dish.
+        #uses wordcloud2
         cities_to_cloud = top_cities
         if(input$selectedCity_wcloud != "ALL")
         {
@@ -130,7 +137,9 @@ shinyServer(function(input, output){
     
   
     recommendation_engine = reactive({
-        
+        ##all comes down to this.
+        #use regression coefficients, adjust mean prices per menu across cities normalized to prices in Los Angeles
+        #present table  of recommended prices based on customer initial input of location, restaurant rating, menu prices
         master_relative_prices = setNames(data.frame(matrix(ncol = 5, nrow = 0), stringsAsFactors = FALSE), c("sub_menu_title", "p_value", "mean_ratio", "is_diff_price","local_city"))
         test_c = tolower(unique(customer_data$city))
        
@@ -203,6 +212,7 @@ shinyServer(function(input, output){
     )
         
     plotRecommendation = reactive({
+        #same function logic as recommendationEngine about except plot recommended price range against customer's initial price points
         master_relative_prices = setNames(data.frame(matrix(ncol = 5, nrow = 0), stringsAsFactors = FALSE), c("sub_menu_title", "p_value", "mean_ratio", "is_diff_price","local_city"))
         test_c = tolower(unique(customer_data$city))
         
@@ -280,12 +290,12 @@ shinyServer(function(input, output){
         for(idx in 1:nrow(master_relative_prices))
         {
             sub_menu_title = master_relative_prices[idx,"sub_menu_title"]
-            price = c(master_relative_prices[idx,"Cust.Lower"],runif(8,master_relative_prices[idx,"Cust.Lower"], master_relative_prices[idx,"Cust.Upper"]),master_relative_prices[idx,"Cust.Upper"])
+            price = c(master_relative_prices[idx,"Cust.Lower"],master_relative_prices[idx,"Cust.Upper"])
             temp_df = data.frame(sub_menu_title, price, stringsAsFactors = FALSE) 
             custPrices_df= rbind(custPrices_df, temp_df)
             
             
-            price = c(master_relative_prices[idx,"Recommended.Lower"],runif(8,master_relative_prices[idx,"Recommended.Lower"],  master_relative_prices[idx,"Recommended.Upper"]), master_relative_prices[idx,"Recommended.Upper"])
+            price = c(master_relative_prices[idx,"Recommended.Lower"], master_relative_prices[idx,"Recommended.Upper"])
             temp_df = data.frame(sub_menu_title, price, stringsAsFactors = FALSE) 
             recommendPrices_df = rbind(recommendPrices_df,temp_df)
         }
@@ -298,39 +308,39 @@ shinyServer(function(input, output){
     })
 
       
-    output$violin_city_prices = renderPlot(
+    output$violin_city_prices = renderPlot(#violin plot of mean prices across cities
         winsor_selected() %>% ggplot(aes(x = sub_menu_title, y = price)) + geom_violin(aes(fill = sub_menu_title)) +coord_flip() +
             labs(title = paste("Price distribution sub-menus:",input$selectedCity), x ="sub-menus", y = "meal price($)")
     )
     
-    output$regressOut = renderPlot(
+    output$regressOut = renderPlot(#regression dot plot of yes or no
         pVal_matrix() %>% ggplot(aes( x = sub_menu_title, y = is_diff_price )) + geom_point(aes(color=is_diff_price), show.legend = F) + coord_flip() +
             facet_wrap(~local_city) + labs(title = "Dot plot showing whether mean of submenu prices in a particular city differ significantly from mean of like submenus in Los Angeles")
     )
     
-    output$ratingsOut = renderPlot(
+    output$ratingsOut = renderPlot(#plot regression line with SE for avg_price ~ ratings regression
         ratings_regression() %>% ggplot( aes(x = ratings, y = avg_price)) + geom_point(aes(color = local_city)) + geom_smooth(method = lm, se=T)
     )
     
-    output$recommendedPlot = renderPlot(
+    output$recommendedPlot = renderPlot(##plot recommended price against customer suggested price
         plotRecommendation() %>% ggplot(aes(x=sub_menu_title,y=price, color = party)) + geom_line(size =2 , position=position_dodge(width=0.4)) +coord_flip()
     )
     
-    output$wcloudOut = renderWordcloud2({
+    output$wcloudOut = renderWordcloud2({#wordcloud output requires it's on special call
         dishname_wCloud() %>% wordcloud2()
     })
     
-    # show data using DataTable
+    # show regression data using DataTable
     output$betaTable <- DT::renderDataTable({
         datatable(ratings_modelOutputs(), rownames=FALSE)
     })
     
-    # show data using DataTable
+    # show customer input data using DataTable
     output$customerInput <- DT::renderDataTable({
         datatable(customer_data, rownames=FALSE)
     })
     
-    # show data using DataTable
+    # show recommended data using DataTable
     output$recommendedTable <- DT::renderDataTable({
         datatable(recommendation_engine(), rownames=FALSE)
     })
