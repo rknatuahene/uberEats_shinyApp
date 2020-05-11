@@ -22,7 +22,7 @@ shinyUI(dashboardPage(
         tags$head(
             tags$link(rel = "stylesheet", type = "text/css", href = "custom.css")
         ),
-        tabItems(
+        tabItems( ##all side tabs are instantiated here
             tabItem(tabName = "main",
                     fluidRow(infoBoxOutput("total_dishes"),
                              infoBoxOutput("rest_total"),
@@ -46,7 +46,8 @@ shinyUI(dashboardPage(
                                             selected = "los angeles")),
                     
                     fluidRow(box(plotOutput("bar_city_submenu")),
-                             box(plotOutput("violin_city_prices")))),       
+                             box(plotOutput("violin_city_prices")))),  
+            
             tabItem(tabName = "regressions",
                     fluidRow(selectizeInput("selectedCity_reg",
                                             "City",
@@ -58,6 +59,7 @@ shinyUI(dashboardPage(
                                             selected = 0.95)
                     ),
                     fluidRow(box(plotOutput("regressOut") , height = 300, width = 300))),
+            
             tabItem(tabName = "ratings",
                     fluidRow(selectizeInput("selectedCity_ratings",
                                             "City",
@@ -66,13 +68,14 @@ shinyUI(dashboardPage(
                     ),
                     fluidRow(box(plotOutput("ratingsOut") , height = 500),
                              box(DT::dataTableOutput("betaTable")))),
+            
             tabItem(tabName = "wcloud",
                     fluidRow(selectizeInput("selectedCity_wcloud",
                                             "City",
                                             choices = c("ALL",sort(city_rest_cnt$local_city)),
                                             selected = "los angeles")
                     ),
-                    fluidRow(box(wordcloud2Output("wcloudOut") , height = 500))),
+                    fluidRow(box(wordcloud2Output("wcloudOut") , height = 500))), #wordcloud requires it's own special output call
             tabItem(tabName = "pricing",
                     fluidRow(box(DT::dataTableOutput("recommendedTable")),
                              box(DT::dataTableOutput("customerInput"))),
