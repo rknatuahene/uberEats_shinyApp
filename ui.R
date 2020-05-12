@@ -1,6 +1,10 @@
 library(DT)
 library(shiny)
 library(shinydashboard)
+library(ggplot2)
+library(dplyr)
+library(tibble)
+library(wordcloud2)
 
 shinyUI(dashboardPage(
     dashboardHeader(title = span("Price my menu",style ="font-size:24px")),

@@ -107,7 +107,7 @@ shinyServer(function(input, output){
     
     ratings_modelOutputs = reactive({
         ##prepare regression coefficients and r-square for tabular display
-        linearMod <- lm(avg_price ~ ratings -1, data=ratings_regression()) 
+        linearMod <- lm(avg_price ~ ratings, data=ratings_regression()) 
         modelCoeffs <- summary(linearMod)$coefficients  # model coefficients
         beta.estimate <- modelCoeffs["ratings", "Estimate"]
         pval.beta = modelCoeffs["ratings", "Pr(>|t|)"]
@@ -186,7 +186,7 @@ shinyServer(function(input, output){
         price_data_control = price_data_control %>% filter((price >0.01) & price <= upperB)
         
         ratings_data = price_data_control %>% group_by(local_city, ratings) %>% summarise(avg_price = mean(price,na.rm= TRUE))
-        linearMod <- lm(avg_price ~ ratings -1, data=ratings_data) 
+        linearMod <- lm(avg_price ~ ratings, data=ratings_data) 
         modelCoeffs <- summary(linearMod)$coefficients  # model coefficients
         beta.estimate <- modelCoeffs["ratings", "Estimate"]
         pval.beta = modelCoeffs["ratings", "Pr(>|t|)"]
@@ -265,7 +265,7 @@ shinyServer(function(input, output){
         city_min_max = rbind(city_min_max%>%select(sub_menu_title, price =actual.lower), city_min_max%>%select(sub_menu_title, price=actual.upper))
         
         ratings_data = price_data_control %>% group_by(local_city, ratings) %>% summarise(avg_price = mean(price,na.rm= TRUE))
-        linearMod <- lm(avg_price ~ ratings -1, data=ratings_data) 
+        linearMod <- lm(avg_price ~ ratings, data=ratings_data) 
         modelCoeffs <- summary(linearMod)$coefficients  # model coefficients
         beta.estimate <- modelCoeffs["ratings", "Estimate"]
         pval.beta = modelCoeffs["ratings", "Pr(>|t|)"]
@@ -350,16 +350,22 @@ shinyServer(function(input, output){
         datatable(recommendation_engine(), rownames=FALSE)
     })
     
-    output$aboutProject <- renderText({"<p><p><p><p><p><p><p><p><p>Project uses data scraped from UberEats US website.<br>The dataset comprises of restaurants, their menus and menu prices located in California.
-     The research question is centered around pricing sub-menu sections of restaurant menus. In particular can we use the data to 
-    create a simple pricing model such that a restaurant operator can submit a spreadsheet of specific sub-menu items, their location and rating and have the model
-    suggest a price range for each sub-menu item that's accurate and representative of the actual observed data.
-    <p> The advantage of the simplified model is that we can reduce the data requirement to just listings from one city - the city with the most listings - and use
-    that data to model prices in other cities.
-    <p>I also analysed the correlation between ratings and meal prices within each sub-menu and incorporated that into our pricing model
-    <p>Although I analysed keywords in dish names to see if there are certain descriptive words associated with higher meal prices, there wasn't
-    even evidence in the corpus I used to justify including textual data into the pricing model at this time"
-        })
+    output$aboutProject <- renderText({"
+      <br><br><h3><b><u>Project aim:</u></h3></b>
+      <font size=4>The research question is centered around pricing sub-menu sections of restaurant menus.
+      <br>In particular, I sought to find out if I could generate useful features from the data scraped from the UberEats website to create a simple model to price restaurant menus.
+      <br>End product will be a tool that allows a restaurant operator to submit a spreadsheet of their restaurant’s location, the restaurant’s rating and specific sub-menu items and have the model suggest an indicative price range for each sub-menu item that's accurate and representative of the actual observed data. 
+      </font>
+      <br><br><h3><b><u>Data source:</u></b></h3>
+      <font size=4>Data scraped from UberEats.com. The dataset comprises of restaurants, their menus and menu prices located in California.
+      </font>
+      <br><br><h3><b><u>Further work:</u></b></h3>
+      <font size=4>Extend coverage to the entire US. 
+      <br>Add more features and improve the accuracy of prediction algorithm.
+      </font>
+      <br><br><h3><b><u>Contact:</u></b></h3> 
+      <font size=4>Robert Atuahene: <a href=\"https://www.linkedin.com/in/robert-atuahene-cfa-8aa19b8/\">LinkedIn</a></font>
+        "})
     
     # show statistics using infoBox
     output$rest_total <- renderInfoBox({

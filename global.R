@@ -1,6 +1,10 @@
+library(dplyr)
+library(tibble)
+library(textreadr)
 
 filtered_set = read.csv("data/CA_data.csv", stringsAsFactors = FALSE)  ##master clean dataset
 customer_data = read.csv("data/customer_feed.csv", stringsAsFactors = F)  ##customer input for recommendation
+about_html_page = read_html("data/about.html")
 
 #limit analysis to top 10 city in California by restaurant count
 city_rest_cnt = filtered_set %>% select(.,name,local_city) %>% distinct() %>% group_by(.,local_city) %>% summarise(., total_cnt = n()) %>% filter(total_cnt > 100)%>%top_n(10, total_cnt)
